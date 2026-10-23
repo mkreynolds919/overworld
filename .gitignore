@@ -1,0 +1,13 @@
+.env
+kaggle.json
+*.pem
+data/
+*.zip
+.venv/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+.DS_Store
+
