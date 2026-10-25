@@ -1,5 +1,6 @@
 import time
 from collections.abc import Callable
+from typing import Any
 
 import requests
 
@@ -31,19 +32,25 @@ class IGDBClient:
         self._clock = clock
         self._last_request_time = float("-inf")
 
-    def query(self, endpoint: str, body: str) -> list[dict]:
+    def query(self, endpoint: str, body: str) -> Any:
         refreshed = False
         for attempt in range(self._max_retries):
             self._throttle()
-            resp = self._session.post(
-                f"{BASE_URL}/{endpoint}",
-                headers={
-                    "Client-ID": self._client_id,
-                    "Authorization": f"Bearer {self._tokens.get()}",
-                },
-                data=body.encode(),
-                timeout=60,
-            )
+            try:
+                resp = self._session.post(
+                    f"{BASE_URL}/{endpoint}",
+                    headers={
+                        "Client-ID": self._client_id,
+                        "Authorization": f"Bearer {self._tokens.get()}",
+                    },
+                    data=body.encode(),
+                    timeout=60,
+                )
+            except (requests.ConnectionError, requests.Timeout):
+                if attempt < self._max_retries:
+                    self._sleep(0.5 * 2**attempt)
+                    continue
+                raise
             if resp.status_code == 200:
                 return resp.json()
             if resp.status_code == 401 and not refreshed:
