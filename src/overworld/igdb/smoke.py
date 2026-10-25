@@ -14,8 +14,12 @@ def build_client() -> IGDBClient:
 def main() -> None:
     client = build_client()
 
-    game = client.query("games", 'fields *; where name = "Kingdom Hearts";')
-    print(json.dumps(game, indent=2)[:3000])
+    print("1) Every field IGDB has for one well-known game:")
+    game = client.query(
+        "games",
+        'fields *; where name = "Kingdom Hearts"; sort total_rating_count desc; limit 1;',
+    )
+    print(sorted(game[0].keys()))
 
     print("\n2) The 3 most-rated games, with expanded references:")
     top = client.query(
@@ -32,6 +36,29 @@ def main() -> None:
     for n in (1, 5, 20, 50):
         result = client.query("games/count", f"where total_rating_count >= {n};")
         print(f"   total_rating_count >= {n:>2}: {result['count']}")
+
+    print("\n4) Game types IGDB uses:")
+    for t in client.query("game_types", "fields id, type; sort id asc; limit 50;"):
+        print(f"   {t['id']:>2}: {t['type']}")
+
+    keep = "(0,4,8,9,10)"
+
+    print("\n5) Counts with the game-type filter:")
+    for n in (5, 10, 20):
+        result = client.query(
+            "games/count",
+            f"where total_rating_count >= {n} & game_type = {keep};",
+        )
+        print(f"   total_rating_count >= {n:>2}: {result['count']}")
+
+    print("\n6) How remakes/remasters link to their original:")
+    versions = client.query(
+        "games",
+        "fields name, game_type, parent_game.name, version_parent.name;"
+        " where game_type = (8,9,10) & total_rating_count >= 50;"
+        " sort total_rating_count desc; limit 8;",
+    )
+    print(json.dumps(versions, indent=2))
 
 
 if __name__ == "__main__":
