@@ -8,6 +8,7 @@ import requests
 EXPIRY_MARGIN_S = 300
 TOKEN_URL = "https://id.twitch.tv/oauth2/token"
 
+
 class TokenProvider:
     def __init__(
         self,
@@ -25,11 +26,17 @@ class TokenProvider:
         self._load_cache()
 
     def get(self) -> str | None:
-        if self._token is None or self._clock() >= self._expires_at - EXPIRY_MARGIN_S:      # if token is close to expiring but not expired, still refresh it
+        if (
+            self._token is None or self._clock() >= self._expires_at - EXPIRY_MARGIN_S
+        ):  # if token is close to expiring but not expired, still refresh it
             self._refresh()
         return self._token
 
-    def invalidate(self) -> None:   # resets the token and expiration time, forcing a refresh on the next get() call
+    def invalidate(
+        self,
+    ) -> (
+        None
+    ):  # resets the token and expiration time, forcing a refresh on the next get() call
         self._token = None
         self._expires_at = 0.0
 
@@ -84,19 +91,3 @@ def fetch_token(client_id: str, client_secret: str) -> dict:
             f"Token request failed ({resp.status_code}): {resp.text[:200]}"
         )
     return resp.json()
-
-
-if __name__ == "__main__":
-    from overworld.config import TOKEN_CACHE, load_credentials
-
-    had_cache = TOKEN_CACHE.exists()
-    tokens = TokenProvider(*load_credentials(), cache_path=TOKEN_CACHE)
-    token = tokens.get()
-
-    if token is None:
-        raise SystemExit("Failed to get token")
-
-    days_left = (tokens.expires_at - time.time()) / 86400
-    print(
-        f"token: {token[:6]}... {'from cache' if had_cache else 'fetched'}, expires in {days_left:.0f} days"
-    )

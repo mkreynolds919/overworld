@@ -7,12 +7,14 @@ import requests
 from overworld.igdb.auth import TokenProvider
 
 BASE_URL = "https://api.igdb.com/v4"
-MIN_INTERVAL_S = 0.26       # rate limit: 4 requests per second
+MIN_INTERVAL_S = 0.26  # rate limit: 4 requests per second
 RETRY_STATUSES = {429, 500, 502, 503, 504}
+
 
 # give certain errors a wrapper to designate them as IGDB-specific errors
 class IGDBError(RuntimeError):
     pass
+
 
 class IGDBClient:
     def __init__(
@@ -34,7 +36,7 @@ class IGDBClient:
 
     def query(self, endpoint: str, body: str) -> Any:
         refreshed = False
-        for attempt in range(self._max_retries):
+        for attempt in range(self._max_retries + 1):
             self._throttle()
             try:
                 resp = self._session.post(
@@ -62,7 +64,6 @@ class IGDBClient:
                 continue
             raise IGDBError(f"{endpoint}: HTTP {resp.status_code}: {resp.text[:300]}")
         raise IGDBError(f"{endpoint}: exceeded max retries ({self._max_retries})")
-
 
     def _throttle(self) -> None:
         wait = self._last_request_time + MIN_INTERVAL_S - self._clock()

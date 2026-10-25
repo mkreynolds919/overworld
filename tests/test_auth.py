@@ -40,7 +40,7 @@ def test_reuses_token_until_near_expiry(monkeypatch):
 
 
 def test_ignores_cache_from_another_app(monkeypatch, tmp_path):
-    fetch, calls = fake_fetch(
+    fetch, _calls = fake_fetch(
         [
             {"access_token": "app1", "expires_in": 5_000_000},
             {"access_token": "app2", "expires_in": 5_000_000},
@@ -54,7 +54,7 @@ def test_ignores_cache_from_another_app(monkeypatch, tmp_path):
 
 
 def test_invalidate_forces_refresh(monkeypatch):
-    fetch, calls = fake_fetch(
+    fetch, _calls = fake_fetch(
         [
             {"access_token": "old", "expires_in": 5_000_000},
             {"access_token": "new", "expires_in": 5_000_000},
