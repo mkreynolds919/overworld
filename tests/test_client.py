@@ -1,8 +1,7 @@
 import json
 
-import requests
-
 import pytest
+import requests
 
 from overworld.igdb.client import IGDBClient, IGDBError
 
