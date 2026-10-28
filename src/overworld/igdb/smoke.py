@@ -60,6 +60,18 @@ def main() -> None:
     )
     print(json.dumps(versions, indent=2))
 
+    print("\n7) Keywords on some well-known games:")
+    sample = client.query(
+        "games",
+        "fields name, keywords.name;"
+        " where game_type = (0,4,8,9,10) & total_rating_count >= 500;"
+        " sort total_rating_count desc; limit 10;",
+    )
+    for g in sample:
+        kws = sorted(k["name"] for k in g.get("keywords", []))
+        print(f"\n   {g['name']} ({len(kws)} keywords)")
+        print(f"   {', '.join(kws[:40])}")
+
 
 if __name__ == "__main__":
     main()
