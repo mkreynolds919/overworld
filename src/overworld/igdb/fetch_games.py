@@ -48,7 +48,7 @@ def build_query(min_ratings: int) -> str:
 def fetch_all(
     client: IGDBClient, out_dir: Path, query: str, page_size: int = PAGE_SIZE
 ) -> dict:
-    
+
     manifest_path = out_dir / "manifest.json"
     if manifest_path.exists():
         saved_query = json.loads(manifest_path.read_text())["query"]
@@ -57,7 +57,7 @@ def fetch_all(
                 "Saved pages came from a different query. "
                 "Rerun with --refresh to download fresh data."
             )
-        
+
     out_dir.mkdir(parents=True, exist_ok=True)
     page_num, total, fetched, cached = 0, 0, 0, 0
     while True:

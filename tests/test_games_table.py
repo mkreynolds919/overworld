@@ -45,6 +45,29 @@ from overworld.graph.games_table import normalize_series
 
 
 def test_normalize_series_merges_punctuation_variants():
-    assert normalize_series("Vampire: The Masquerade") == normalize_series("vampire the masquerade")
-    assert normalize_series("Vampire: The Masquerade – Bloodlines") == "vampire the masquerade bloodlines"
+    assert normalize_series("Vampire: The Masquerade") == normalize_series(
+        "vampire the masquerade"
+    )
+    assert (
+        normalize_series("Vampire: The Masquerade – Bloodlines")
+        == "vampire the masquerade bloodlines"
+    )
     assert normalize_series("Dungeons & Dragons") == "dungeons dragons"
+
+
+from overworld.graph.games_table import series_keys
+
+
+def test_normal_game_uses_franchises_and_collections():
+    assert series_keys(["Grand Theft Auto"], ["Grand Theft Auto"]) == [
+        "grand theft auto"
+    ]
+
+
+def test_crossover_uses_only_collections():
+    franchises = ["Mario", "Zelda", "Metroid", "Kirby", "Pokemon"]
+    assert series_keys(franchises, ["Super Smash Bros."]) == ["super smash bros"]
+
+
+def test_crossover_without_collections_has_no_series():
+    assert series_keys(["A", "B", "C", "D"], []) == []

@@ -11,6 +11,17 @@ from overworld.config import DATA_DIR
 RAW_DIR = DATA_DIR / "raw" / "igdb" / "games"
 OUT_PATH = DATA_DIR / "processed" / "games.parquet"
 
+MAX_FRANCHISES = 3
+
+
+def series_keys(franchises: list[str], collections: list[str]) -> list[str]:
+    """A game's series for edge building. Crossovers keep only their own collections."""
+    if len(franchises) > MAX_FRANCHISES:
+        keys = collections
+    else:
+        keys = franchises + collections
+    return sorted({normalize_series(k) for k in keys})
+
 
 def load_raw_games(raw_dir: Path) -> list[dict]:
     games = []
@@ -37,10 +48,8 @@ def normalize_series(name: str) -> str:
 
 def flatten_game(game: dict) -> dict:
     year = release_year(game.get("first_release_date"))
-    series = {
-        normalize_series(s)
-        for s in names(game.get("franchises")) + names(game.get("collections"))
-    }
+    franchises = names(game.get("franchises"))
+    collections = names(game.get("collections"))
     developers = sorted(
         {
             c["company"]["name"]
@@ -59,7 +68,9 @@ def flatten_game(game: dict) -> dict:
         "platforms": names(game.get("platforms")),
         "genres": names(game.get("genres")),
         "themes": names(game.get("themes")),
-        "series": sorted(series),
+        "franchises": franchises,
+        "collections": collections,
+        "series": series_keys(franchises, collections),
         "developers": developers,
         "similar_games": game.get("similar_games", []),
         "cover_image_id": (game.get("cover") or {}).get("image_id"),
