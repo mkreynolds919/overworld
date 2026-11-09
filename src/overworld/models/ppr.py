@@ -2,6 +2,8 @@ import numpy as np
 import pandas as pd
 from scipy import sparse
 
+from overworld.graph.families import version_families
+
 RESTART_PROB = 0.15
 TOL = 1e-6
 MAX_ITER = 200
@@ -51,6 +53,7 @@ class PersonalizedPageRank:
         self._PT = self._P.T.tocsr()
         self._alpha = restart_prob
         self._exclude_neighbors = exclude_neighbors
+        self._family = version_families(games).to_numpy()
 
     def scores(self, seed: int) -> np.ndarray:
         s = self._pos[seed]
@@ -72,4 +75,14 @@ class PersonalizedPageRank:
             r[self._P[s].indices] = 0.0
         top = np.argsort(-r, kind="stable")[:k]
         top = top[r[top] > 0]
-        return self._ids[top].tolist()
+        order = np.argsort(-r, kind="stable")
+        seen = {self._family[s]}
+        out = []
+        for i in order:
+            if r[i] <= 0 or len(out) == k:
+                break
+            if self._family[i] in seen:
+                continue
+            seen.add(self._family[i])
+            out.append(self._ids[i])
+        return out
