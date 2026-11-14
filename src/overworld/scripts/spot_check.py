@@ -1,6 +1,7 @@
 """Print PageRank's top 10 for a few games, by name, on the full graph."""
 
 import pandas as pd
+
 from overworld.config import DATA_DIR
 from overworld.models.ppr import PersonalizedPageRank
 

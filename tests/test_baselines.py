@@ -58,13 +58,17 @@ class OnlyVersionOfSeed:
     name = "only version"
 
     def recommend(self, seed, k=10):
-        return [2]                       # game 2 is a version of seed 1
+        return [2]  # game 2 is a version of seed 1
 
 
 def test_harness_ignores_seed_versions_at_family_level():
-    family = pd.Series({1: 0, 2: 0, 3: 1})        # 1 and 2 are one family
+    family = pd.Series({1: 0, 2: 0, 3: 1})  # 1 and 2 are one family
     queries = [Query(1, frozenset({2, 3}), "g")]
-    with_families = evaluate(OnlyVersionOfSeed(), queries, catalog_size=2, family=family)
+    with_families = evaluate(
+        OnlyVersionOfSeed(), queries, catalog_size=2, family=family
+    )
     without = evaluate(OnlyVersionOfSeed(), queries, catalog_size=3)
-    assert with_families["hit_rate"] == 0.0       # recommending the seed's own remaster isn't a hit
-    assert without["hit_rate"] == 1.0             # game-level scoring would count it
+    assert (
+        with_families["hit_rate"] == 0.0
+    )  # recommending the seed's own remaster isn't a hit
+    assert without["hit_rate"] == 1.0  # game-level scoring would count it

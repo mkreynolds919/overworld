@@ -3,6 +3,7 @@
 import sys
 
 import pandas as pd
+
 from overworld.config import DATA_DIR
 
 games = pd.read_parquet(DATA_DIR / "processed" / "games.parquet")
