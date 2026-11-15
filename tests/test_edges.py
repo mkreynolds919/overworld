@@ -129,3 +129,51 @@ def test_content_edges_are_reproducible():
     a = content_edges(games)
     b = content_edges(games)
     pd.testing.assert_frame_equal(a, b)
+
+
+
+from overworld.graph.edges import diversify
+
+SERIES = np.array([[], ["a"], ["a"], ["a"], ["b"], ["a", "c"]], dtype=object)
+FAMILY = np.array([0, 1, 2, 3, 4, 5])
+
+
+def test_caps_each_other_series():
+    picked = diversify(np.array([1, 2, 3, 4]), k=3, series=SERIES, family=FAMILY, self_index=0, cap=2)
+    assert list(picked) == [1, 2, 4]               # the third "a" game is skipped
+
+
+def test_own_series_is_exempt():
+    picked = diversify(np.array([2, 3, 5]), k=3, series=SERIES, family=FAMILY, self_index=1, cap=2)
+    assert list(picked) == [2, 3, 5]               # all share game 1's series "a"
+
+
+def test_one_per_family_and_never_own_family():
+    family = np.array([0, 0, 1, 1, 2, 3])          # 0 and 1 are one family; 2 and 3 another
+    picked = diversify(np.array([1, 2, 3, 4]), k=4, series=np.array([[]] * 6, dtype=object),
+                       family=family, self_index=0)
+    assert list(picked) == [2, 4]                  # 1 is own family; 3 duplicates 2's family
+
+
+def test_multi_series_candidate_counts_toward_each():
+    series = np.array([[], ["c"], ["c"], ["a", "c"]], dtype=object)
+    picked = diversify(np.array([1, 2, 3]), k=3, series=series, family=np.arange(4), self_index=0, cap=2)
+    assert list(picked) == [1, 2]                  # game 3 blocked: "c" is full
+
+
+def test_plain_content_edges_unchanged_by_switch():
+    games = tag_games(themes=[["horror"]] * 6 + [["comedy"]], genres=[["shooter"]] * 6 + [[]])
+    games = games.assign(series=[[]] * 7)
+    pd.testing.assert_frame_equal(content_edges(games), content_edges(games, diversify_series=False))
+
+
+from overworld.graph.edges import cap_final_edges
+
+
+def test_final_cap_drops_edges_picked_from_the_other_side():
+    # Game 0 has no series; games 1-4 are all in series "s" and each linked to 0.
+    edges = pd.DataFrame({"src": [0, 0, 0, 0], "dst": [1, 2, 3, 4], "weight": [0.9, 0.8, 0.7, 0.6]})
+    series = pd.Series({0: [], 1: ["s"], 2: ["s"], 3: ["s"], 4: ["s"]})
+    family = pd.Series({i: i for i in range(5)})
+    kept = cap_final_edges(edges, series, family, cap=2)
+    assert list(zip(kept.src, kept.dst)) == [(0, 1), (0, 2)]      # strongest two "s" links survive

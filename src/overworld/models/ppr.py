@@ -46,7 +46,9 @@ class PersonalizedPageRank:
         restart_prob: float = RESTART_PROB,
         type_weights: dict[str, float] | None = None,
         exclude_neighbors: bool = False,
+        name="personalized pagerank",
     ) -> None:
+        self.name = name
         self._ids = games.index.to_numpy()
         self._pos = {g: i for i, g in enumerate(self._ids)}
         self._P, self._dangling = build_transition(edges, self._ids, type_weights)

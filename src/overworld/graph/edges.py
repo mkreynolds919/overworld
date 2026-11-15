@@ -7,6 +7,7 @@ import pandas as pd
 from scipy import sparse
 
 from overworld.config import DATA_DIR
+from overworld.graph.families import version_families
 
 GAMES_PATH = DATA_DIR / "processed" / "games.parquet"
 EDGES_PATH = DATA_DIR / "processed" / "edges.parquet"
@@ -19,6 +20,9 @@ CONTENT_TOP_N = 10
 CONTENT_REL_THRESHOLD = 0.3
 CHUNK_ROWS = 1000
 TIEBREAK_SEED = 12
+
+SERIES_CAP = 2  # content links can only go to 2 members of a given other series
+POOL_SIZE = 100  # num candidates considered before diversifying
 
 
 def group_edges(games: pd.DataFrame, column: str, base: float) -> pd.DataFrame:
@@ -76,24 +80,94 @@ def tag_matrix(games: pd.DataFrame) -> sparse.csr_matrix:
     return sparse.diags(1 / norms) @ X
 
 
+def diversify(
+    candidates: np.ndarray,
+    k: int,
+    series: np.ndarray,
+    family: np.ndarray,
+    self_index: int,
+    cap: int = SERIES_CAP,
+) -> np.ndarray:
+    # Pick up to k candidates in order, at most 'cap' per other series and one per version family
+    own_series = set(series[self_index])
+    seen_families = {family[self_index]}
+    used: dict[str, int] = {}
+    picked = []
+    for j in candidates:
+        if len(picked) == k:
+            break
+        if family[j] in seen_families:
+            continue
+        others = [s for s in series[j] if s not in own_series]
+        if any(used.get(s, 0) >= cap for s in others):
+            continue
+        picked.append(j)
+        seen_families.add(family[j])
+        for s in others:
+            used[s] = used.get(s, 0) + 1
+    return np.array(picked, dtype=int)
+
+
+def cap_final_edges(
+    edges: pd.DataFrame, series: pd.Series, family: pd.Series, cap: int = SERIES_CAP
+) -> pd.DataFrame:
+    # Apply series cap both ways for content edges
+    both_ends = pd.concat([
+        edges.assign(game=edges["src"], other=edges["dst"]),
+        edges.assign(game=edges["dst"], other=edges["src"]),
+    ]).sort_values("weight", ascending=False, kind="stable")
+
+    rejected: set[tuple[int, int]] = set()
+    for game, rows in both_ends.groupby("game", sort=False):
+        own_series = set(series[game])
+        seen_families = {family[game]}
+        used: dict[str, int] = {}
+        for src, dst, other in zip(rows["src"], rows["dst"], rows["other"]):
+            others = [s for s in series[other] if s not in own_series]
+            if family[other] in seen_families or any(used.get(s, 0) >= cap for s in others):
+                rejected.add((src, dst))
+                continue
+            seen_families.add(family[other])
+            for s in others:
+                used[s] = used.get(s, 0) + 1
+
+    keep = [(s, d) not in rejected for s, d in zip(edges["src"], edges["dst"])]
+    return edges[keep].reset_index(drop=True)
+
+
 def select_neighbors(
-    row: np.ndarray, top_n: int, rel_threshold: float, tiebreak=None
+    row: np.ndarray,
+    top_n: int,
+    rel_threshold: float,
+    tiebreak=None,
+    series=None,
+    family=None,
+    self_index=None,
 ) -> np.ndarray:
     k = min(top_n, len(row) - 1)
     if k <= 0:
         return np.array([], dtype=int)
     score = row if tiebreak is None else row + 1e-6 * tiebreak
-    top = np.argpartition(score, -k)[-k:]
+    if series is None:
+        top = np.argpartition(score, -k)[-k:]
+    else:
+        pool = min(POOL_SIZE, len(row) - 1)
+        cand = np.argpartition(score, -pool)[-pool:]
+        cand = cand[np.argsort(-score[cand], kind="stable")]
+        cand = cand[row[cand] > 0]
+        top = diversify(cand, k, series, family, self_index)
     top = top[row[top] > 0]
     if len(top) == 0:
         return top
     return top[row[top] >= rel_threshold * row[top].max()]
 
 
-def content_edges(games: pd.DataFrame) -> pd.DataFrame:
+def content_edges(games: pd.DataFrame, diversify_series: bool = False) -> pd.DataFrame:
     X = tag_matrix(games).tocsr()
     ids = games.index.to_numpy()
     rng = np.random.default_rng(TIEBREAK_SEED)
+    series = games["series"].to_numpy() if diversify_series else None
+    family = version_families(games).to_numpy() if diversify_series else None
     best: dict[tuple[int, int], float] = {}
 
     for start in range(0, X.shape[0], CHUNK_ROWS):
@@ -102,13 +176,25 @@ def content_edges(games: pd.DataFrame) -> pd.DataFrame:
             i = start + r
             row[i] = 0.0
             noise = rng.random(len(row))
-            for j in select_neighbors(row, CONTENT_TOP_N, CONTENT_REL_THRESHOLD, noise):
+            picks = select_neighbors(
+                row,
+                CONTENT_TOP_N,
+                CONTENT_REL_THRESHOLD,
+                noise,
+                series=series,
+                family=family,
+                self_index=i,
+            )
+            for j in picks:
                 pair = (min(ids[i], ids[j]), max(ids[i], ids[j]))
                 best[pair] = max(best.get(pair, 0.0), BASE_WEIGHTS["content"] * row[j])
 
-    return pd.DataFrame(
+    content = pd.DataFrame(
         [(a, b, w) for (a, b), w in best.items()], columns=["src", "dst", "weight"]
     )
+    if diversify_series:
+        content = cap_final_edges(content, games["series"], version_families(games))
+    return content
 
 
 def build_edges(games: pd.DataFrame) -> pd.DataFrame:
@@ -118,7 +204,7 @@ def build_edges(games: pd.DataFrame) -> pd.DataFrame:
         "developer": apply_year_decay(
             group_edges(games, "developers", BASE_WEIGHTS["developer"]), games["year"]
         ),
-        "content": content_edges(games),
+        "content": content_edges(games, diversify_series=True),
     }
     edges = pd.concat(
         [df.assign(type=edge_type) for edge_type, df in parts.items()],

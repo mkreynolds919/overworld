@@ -12,6 +12,7 @@ from overworld.evaluation.split import (
     make_queries,
     split_groups,
 )
+from overworld.graph.edges import content_edges
 from overworld.graph.families import version_families
 from overworld.models.baselines import (
     ContentRecommender,
@@ -21,6 +22,11 @@ from overworld.models.baselines import (
 from overworld.models.ppr import PersonalizedPageRank
 
 SPLIT = "val"  # switch to "test" exactly once, for the final README table
+
+
+def with_content(edges: pd.DataFrame, content: pd.DataFrame) -> pd.DataFrame:
+    rest = edges[edges["type"] != "content"]
+    return pd.concat([rest, content.assign(type="content")], ignore_index=True)
 
 
 def main() -> None:
@@ -34,11 +40,23 @@ def main() -> None:
     graph = hold_out(edges, groups, splits[SPLIT])  # NEVER the full edges here
     family = version_families(games)
 
+    held = splits[SPLIT]
+    hidden = set(held)
+    masked = games.assign(
+        series=games["series"].map(lambda keys: [k for k in keys if k not in hidden])
+    )
+
+    plain = hold_out(with_content(edges, content_edges(games)), groups, held)
+    diverse = hold_out(
+        with_content(edges, content_edges(masked, diversify_series=True)), groups, held
+    )
+
     models = [
         PopularityRecommender(games),
         ContentRecommender(games),
         IGDBSimilarRecommender(games),
-        PersonalizedPageRank(games, graph),
+        PersonalizedPageRank(games, plain),
+        PersonalizedPageRank(games, diverse, name="ppr (diverse content)"),
     ]
     per_query, table = {}, {}
     for model in models:
@@ -60,6 +78,9 @@ def main() -> None:
     for other in ("igdb similar_games", "same-genre"):
         diff = format_ci(paired_difference(ppr, per_query[other]))
         print(f"\nPageRank − {other}:\n{diff.to_string()}")
+
+    diff = format_ci(paired_difference(per_query["ppr (diverse content)"], ppr))
+    print(f"\nDiverse - plain PageRank:\n{diff.to_string()}")
 
 
 if __name__ == "__main__":
