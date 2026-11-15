@@ -58,3 +58,26 @@ def test_exclude_neighbors_is_opt_in():
     default = PersonalizedPageRank(games(4), PATH).recommend(1)
     product = PersonalizedPageRank(games(4), PATH, exclude_neighbors=True).recommend(1)
     assert 2 in default and 2 not in product
+
+
+def series_games():
+    return pd.DataFrame(
+        {"series": [[], [], ["s"], ["s"], ["s"], []]}, index=pd.Index(range(1, 7), name="id")
+    )
+
+
+# Seed 1 → hub 2 → {3, 4, 5 (all series "s"), 6}
+STAR = edges([(1, 2, "content", 1.0), (2, 3, "content", 1.0), (2, 4, "content", 1.0),
+              (2, 5, "content", 1.0), (2, 6, "content", 1.0)])
+
+
+def test_rec_series_cap_limits_one_series():
+    recs = PersonalizedPageRank(series_games(), STAR, exclude_neighbors=True,
+                                rec_series_cap=2).recommend(1)
+    assert sum(g in {3, 4, 5} for g in recs) == 2
+    assert 6 in recs
+
+
+def test_no_series_cap_by_default():
+    recs = PersonalizedPageRank(series_games(), STAR, exclude_neighbors=True).recommend(1)
+    assert {3, 4, 5} <= set(recs)

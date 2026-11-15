@@ -7,6 +7,7 @@ from overworld.graph.families import version_families
 RESTART_PROB = 0.15
 TOL = 1e-6
 MAX_ITER = 200
+REC_SERIES_CAP = 3
 
 
 def build_transition(
@@ -46,6 +47,7 @@ class PersonalizedPageRank:
         restart_prob: float = RESTART_PROB,
         type_weights: dict[str, float] | None = None,
         exclude_neighbors: bool = False,
+        rec_series_cap: int | None = None,
         name="personalized pagerank",
     ) -> None:
         self.name = name
@@ -56,6 +58,8 @@ class PersonalizedPageRank:
         self._alpha = restart_prob
         self._exclude_neighbors = exclude_neighbors
         self._family = version_families(games).to_numpy()
+        self._series = games["series"].to_numpy() if "series" in games else None
+        self._rec_series_cap = rec_series_cap
 
     def scores(self, seed: int) -> np.ndarray:
         s = self._pos[seed]
@@ -79,12 +83,26 @@ class PersonalizedPageRank:
         top = top[r[top] > 0]
         order = np.argsort(-r, kind="stable")
         seen = {self._family[s]}
+        used: dict[str, int] = {}
+        capping = self._rec_series_cap is not None and self._series is not None
         out = []
         for i in order:
             if r[i] <= 0 or len(out) == k:
                 break
             if self._family[i] in seen:
                 continue
+            keys = self._series[i] if capping else []
+            if any(used.get(key, 0) >= self._rec_series_cap for key in keys):
+                continue
             seen.add(self._family[i])
+            for key in keys:
+                used[key] = used.get(key, 0) + 1
             out.append(self._ids[i])
         return out
+
+
+def product_recommender(games: pd.DataFrame, edges: pd.DataFrame) -> PersonalizedPageRank:
+    """The settings the app uses: only games not already connected, at most 3 per series."""
+    return PersonalizedPageRank(
+        games, edges, exclude_neighbors=True, rec_series_cap=REC_SERIES_CAP, name="ppr (product)"
+    )
