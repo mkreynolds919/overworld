@@ -22,6 +22,7 @@ def client():
             "series": [[], ["dark souls"], ["dark souls"], []],
             "developers": [["FromSoftware"]] * 3 + [["Turn 10"]],
             "cover_image_id": ["co1", "co2", None, "co4"],
+            "summary": ["A gothic hunt.", None, None, None],
         },
         index=pd.Index([1, 2, 3, 4], name="id"),
     )
@@ -61,3 +62,7 @@ def test_bad_inputs_are_422(client):
     assert client.get("/games/search", params={"q": ""}).status_code == 422
     assert client.get("/games/search", params={"q": "a", "limit": 0}).status_code == 422
     assert client.get("/games/abc").status_code == 422
+
+def test_detail_includes_summary_or_null(client):
+    assert client.get("/games/1").json()["summary"] == "A gothic hunt."
+    assert client.get("/games/4").json()["summary"] is None

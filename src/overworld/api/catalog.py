@@ -51,6 +51,7 @@ class Catalog:
         g = self.games.loc[game_id]
         members = self.family.index[self.family == self.family[game_id]]
         versions = self.games.loc[members].sort_values("year", kind="stable")
+        summary = g.get("summary")
         return {
             **self.summary(game_id),
             "name": g["name"],
@@ -60,4 +61,5 @@ class Catalog:
             "series": [str(x) for x in g["series"]],
             "developers": [str(x) for x in g["developers"]],
             "versions": [{"id": int(v), "display_name": versions.loc[v, "display_name"]} for v in versions.index],
+            "summary": summary if isinstance(summary, str) else None,
         }

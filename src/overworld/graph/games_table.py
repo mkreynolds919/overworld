@@ -10,6 +10,7 @@ from overworld.config import DATA_DIR
 
 RAW_DIR = DATA_DIR / "raw" / "igdb" / "games"
 OUT_PATH = DATA_DIR / "processed" / "games.parquet"
+SUMMARIES_PATH = DATA_DIR / "raw" / "igdb" / "summaries.json"
 
 MAX_FRANCHISES = 3
 
@@ -28,6 +29,11 @@ def load_raw_games(raw_dir: Path) -> list[dict]:
     for page in sorted(raw_dir.glob("page_*.json")):
         games.extend(json.loads(page.read_text()))
     return games
+
+def load_summaries(path: Path) -> dict[int, str]:
+    if not path.exists():
+        return {}
+    return {int(k): v for k, v in json.loads(path.read_text()).items()}
 
 
 def names(items: list[dict] | None) -> list[str]:
@@ -85,6 +91,7 @@ def build_games_table(raw_games: list[dict]) -> pd.DataFrame:
 
 def main() -> None:
     df = build_games_table(load_raw_games(RAW_DIR))
+    df["summary"] = df.index.map(load_summaries(SUMMARIES_PATH))
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     df.to_parquet(OUT_PATH)
     print(f"{len(df)} games -> {OUT_PATH}")

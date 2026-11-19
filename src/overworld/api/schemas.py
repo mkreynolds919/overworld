@@ -21,6 +21,7 @@ class GameDetail(GameSummary):
     series: list[str]
     developers: list[str]
     versions: list[Version]
+    summary: str | None
 
 
 class Health(BaseModel):

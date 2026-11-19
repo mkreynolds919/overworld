@@ -71,3 +71,15 @@ def test_crossover_uses_only_collections():
 
 def test_crossover_without_collections_has_no_series():
     assert series_keys(["A", "B", "C", "D"], []) == []
+
+
+import json
+
+from overworld.graph.games_table import load_summaries
+
+
+def test_load_summaries_converts_keys_and_tolerates_missing_file(tmp_path):
+    path = tmp_path / "summaries.json"
+    assert load_summaries(path) == {}
+    path.write_text(json.dumps({"1942": "Monster hunting."}))
+    assert load_summaries(path) == {1942: "Monster hunting."}
