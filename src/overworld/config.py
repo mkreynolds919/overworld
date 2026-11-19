@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = REPO_ROOT / "data"
 TOKEN_CACHE = DATA_DIR / ".twitch_token.json"
+MIN_RATINGS = 10
 
 
 def load_credentials() -> tuple[str, str]:
